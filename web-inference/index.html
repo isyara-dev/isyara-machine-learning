@@ -12,11 +12,11 @@
       font-family: Arial, sans-serif;
       text-align: center;
     }
-    
+
     h1 {
       margin-top: 20px;
     }
-    
+
     canvas {
       position: absolute;
       top: 80px;
@@ -27,31 +27,38 @@
       transform: scale(-1, 1) translateX(50%);
     }
 
-    #prediction {
+    #prediction, #confidence, #success {
       position: absolute;
-      top: 100px;
       left: 50%;
       transform: translateX(-50%);
+      z-index: 10;
+    }
+
+    #prediction {
+      top: 100px;
       font-size: 24px;
       font-weight: bold;
       color: gold;
       background-color: rgba(0, 0, 0, 0.5);
       padding: 8px 16px;
       border-radius: 10px;
-      z-index: 10;
     }
 
     #confidence {
-      position: absolute;
       top: 145px;
-      left: 50%;
-      transform: translateX(-50%);
       font-size: 16px;
       color: white;
       background-color: rgba(0, 0, 0, 0.5);
       padding: 4px 8px;
       border-radius: 5px;
-      z-index: 10;
+    }
+
+    #success {
+      top: 190px;
+      font-size: 20px;
+      color: lightgreen;
+      background-color: rgba(0, 0, 0, 0.5);
+      font-weight: bold;
     }
   </style>
 </head>
@@ -59,11 +66,14 @@
   <h1>Deteksi Bahasa Isyarat Real-time</h1>
   <video id="video" autoplay playsinline style="display: none;"></video>
   <canvas id="canvas"></canvas>
+  <canvas id="landmarkCanvas"></canvas>
   <div id="prediction">Predicted: -</div>
   <div id="confidence">Confidence: -</div>
+  <div id="success"></div>
 
   <!-- MediaPipe & TensorFlow.js -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
 
@@ -71,15 +81,24 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+
+    const landmarkCanvas = document.getElementById('landmarkCanvas');
+    const landmarkCtx = landmarkCanvas.getContext('2d');
+
     const predictionDiv = document.getElementById('prediction');
     const confidenceDiv = document.getElementById('confidence');
+    const successDiv = document.getElementById('success');
 
-    canvas.width = 640;
-    canvas.height = 480;
+    let lastPrediction = null;
+    let predictionStartTime = null;
+    const HOLD_DURATION = 2000;
+    const CONFIDENCE_THRESHOLD = 0.8;
+    const labelMap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+    canvas.width = landmarkCanvas.width = 640;
+    canvas.height = landmarkCanvas.height = 480;
 
     let tfModel = null;
-    const labelMap = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    const CONFIDENCE_THRESHOLD = 0.7;
 
     async function loadModel() {
       try {
@@ -97,82 +116,89 @@
 
     function processLandmarks(landmarks) {
       let features = [];
-
       if (landmarks.length === 1) {
-        console.log("🛠️ Only one hand detected, assigning as right hand.");
-        
-        // Isi left hand dengan 0 terlebih dahulu
         const leftHand = Array(63).fill(0);
         features.push(...leftHand);
-        
-        // Lanjutkan dengan right hand
         const rightHand = normalizeLandmarks(landmarks[0], landmarks[0][0]);
         rightHand.forEach(coord => features.push(...coord));
-
       } else if (landmarks.length === 2) {
         const sortedHands = landmarks.sort((a, b) => a[0].x - b[0].x);
         const leftHand = normalizeLandmarks(sortedHands[0], sortedHands[0][0]);
         const rightHand = normalizeLandmarks(sortedHands[1], sortedHands[1][0]);
-
         leftHand.forEach(coord => features.push(...coord));
         rightHand.forEach(coord => features.push(...coord));
       }
-
-      // Jika jumlah fitur tidak sesuai (harus 126), isi semua dengan 0
-      if (features.length !== 126) {
-        console.warn("⚠️ Feature length is not 126. Setting all features to 0.");
-        features = Array(126).fill(0);
-      }
-
-      console.log("Normalized features:", features);
+      if (features.length !== 126) features = Array(126).fill(0);
       return tf.tensor2d([features], [1, 126]);
     }
 
     const hands = new Hands({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5, smoothLandmarks: true });
-    
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+
     hands.onResults(async (results) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+      landmarkCtx.clearRect(0, 0, landmarkCanvas.width, landmarkCanvas.height);
+
       if (results.multiHandLandmarks && tfModel) {
+        for (const landmarks of results.multiHandLandmarks) {
+          drawConnectors(landmarkCtx, landmarks, HAND_CONNECTIONS, { color: '#12057d', lineWidth: 2 });
+          drawLandmarks(landmarkCtx, landmarks, { color: '#dc3767', radius: 2 });
+        }
+
         const inputTensor = processLandmarks(results.multiHandLandmarks);
+        try {
+          const output = tfModel.predict(inputTensor);
+          const predictions = output.arraySync()[0];
+          const maxPrediction = Math.max(...predictions);
+          const predictedClass = predictions.indexOf(maxPrediction);
+          const confidence = (maxPrediction * 100).toFixed(1);
 
-        if (inputTensor) {
-          try {
-            const output = tfModel.predict(inputTensor);
-            const predictions = output.arraySync()[0];
+          if (maxPrediction > CONFIDENCE_THRESHOLD) {
+            const predictedLetter = labelMap[predictedClass];
+            predictionDiv.textContent = `Predicted: ${predictedLetter}`;
+            confidenceDiv.textContent = `Confidence: ${confidence}%`;
 
-            const maxPrediction = Math.max(...predictions);
-            const predictedClass = predictions.indexOf(maxPrediction);
-            const confidence = (maxPrediction * 100).toFixed(1);
-
-            if (maxPrediction > CONFIDENCE_THRESHOLD) {
-              predictionDiv.textContent = `Predicted: ${labelMap[predictedClass]}`;
-              confidenceDiv.textContent = `Confidence: ${confidence}%`;
+            const now = Date.now();
+            if (lastPrediction === predictedLetter) {
+              if (now - predictionStartTime >= HOLD_DURATION) {
+                successDiv.textContent = "✅ Berhasil!";
+              } else {
+                successDiv.textContent = "";
+              }
             } else {
-              predictionDiv.textContent = "Predicted: -";
-              confidenceDiv.textContent = "Confidence: -";
+              lastPrediction = predictedLetter;
+              predictionStartTime = now;
+              successDiv.textContent = "";
             }
-
-            inputTensor.dispose();
-            tf.dispose(output);
-          } catch (error) {
-            console.error("Prediction error:", error);
+          } else {
+            predictionDiv.textContent = "Predicted: -";
+            confidenceDiv.textContent = "Confidence: -";
+            successDiv.textContent = "";
+            lastPrediction = null;
+            predictionStartTime = null;
           }
+
+          inputTensor.dispose();
+          tf.dispose(output);
+        } catch (err) {
+          console.error("Prediction error:", err);
         }
       } else {
         predictionDiv.textContent = "Predicted: -";
         confidenceDiv.textContent = "Confidence: -";
+        successDiv.textContent = "";
+        landmarkCtx.clearRect(0, 0, landmarkCanvas.width, landmarkCanvas.height);
       }
     });
 
-    const camera = new Camera(video, { 
-      onFrame: async () => { 
-        await hands.send({ image: canvas }); 
-      }, 
-      width: 640, 
-      height: 480 
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({ image: video });
+      },
+      width: 640,
+      height: 480
     });
 
     async function startApp() {
