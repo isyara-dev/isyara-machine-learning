@@ -150,6 +150,12 @@ For model training & static inference:
 
 ### Web Inference
 
+#### Option 1: Live Demo
+Access our ready-to-use demo:  
+👉 [Open the app in your browser](https://isyara-inference.netlify.app/) (Recommended: use Google Chrome for best compatibility)
+
+#### Option 2: Local Deployment
+To run locally with the latest model:
 1. Download `index.html` and the corresponding `_tfjs_model.zip` file
 2. Extract `_tfjs_model.zip`
 3. Ensure `model.json` and `*.bin` files are in the same directory
@@ -164,3 +170,4 @@ For model training & static inference:
 * If only one hand is detected, the system will still work using a fallback approach.
 
 ---
+
