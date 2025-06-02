@@ -18,20 +18,20 @@ This project is a **BISINDO (Indonesian Sign Language)** recognition system base
 ├── model/
 │   ├── cnn_tfjs_model.zip          # CNN model in TensorFlow.js format
 │   ├── dnn_tfjs_model.zip          # DNN model in TensorFlow.js format
-│   ├── saved_models_cnn.zip        # CNN model (TensorFlow SavedModel format)
-│   ├── saved_models_dnn.zip        # DNN model (TensorFlow SavedModel format)
-│   └── label_encoder.pkl           # Label encoder for gesture classification
+│   ├── label_encoder.pkl           # Label encoder for gesture classification 
+│   ├── saved_models_cnn.zip        # CNN model (TensorFlow SavedModel format) 
+│   └── saved_models_dnn.zip        # DNN model (TensorFlow SavedModel format)
 │
 ├── web-inference/
-│   ├── index.html                  # Real-time inference web page
-│   ├── model.json                  # TFJS model architecture
-│   ├── group1-shard1of1.bin        # TFJS model weights
+│   ├── group1-shard1of1.bin        # TFJS model weights 
+│   ├── index.html                  # Real-time inference web page 
+│   └── model.json                  # TFJS model architecture
 │
 ├── BISINDO.zip                     # Bisindo Dataset   
-├── notebook.py                     # Main script for training, evaluation & basic inference
+├── README.md                       # Project documentation
 ├── notebook.ipynb                  # Jupyter Notebook version
-├── requirements.txt                # Python dependencies
-└── README.md                       # Project documentation
+├── notebook.py                     # Main script for training, evaluation & basic inference
+└── requirements.txt                # Python dependencies
 ```
 
 ---
