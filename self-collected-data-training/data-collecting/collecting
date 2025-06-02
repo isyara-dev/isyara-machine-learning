@@ -1,10 +1,9 @@
+import os
 import cv2
 import mediapipe as mp
 import numpy as np
 import csv
-import os
 import time
-
 from datetime import datetime
 
 # Inisialisasi MediaPipe Hands
@@ -15,7 +14,7 @@ hands = mp_hands.Hands(static_image_mode=False,
                        min_tracking_confidence=0.7)
 mp_draw = mp.solutions.drawing_utils
 
-# Fungsi untuk membuat header CSV
+# Buat header untuk CSV
 def create_csv_header():
     header = ['label']
     for hand in ['left', 'right']:
@@ -23,7 +22,7 @@ def create_csv_header():
             header.extend([f'{hand}_{i}_x', f'{hand}_{i}_y', f'{hand}_{i}_z'])
     return header
 
-# Fungsi untuk mengekstrak landmark dari hasil MediaPipe
+# Ekstrak landmark sebagai flat list (1D)
 def extract_landmarks(results):
     left_hand = [0.0] * 63
     right_hand = [0.0] * 63
@@ -39,7 +38,15 @@ def extract_landmarks(results):
                 right_hand = coords
     return left_hand, right_hand
 
-# Fungsi untuk menyimpan data ke CSV
+# Ubah flat list menjadi list 3D [[x, y, z], ...]
+def reshape_landmarks(flat_landmarks):
+    return [[flat_landmarks[i], flat_landmarks[i+1], flat_landmarks[i+2]] for i in range(0, len(flat_landmarks), 3)]
+
+# Normalisasi landmark berdasarkan posisi pergelangan tangan (wrist)
+def normalize_landmarks(landmarks, wrist):
+    return [[lm[0] - wrist[0], lm[1] - wrist[1], lm[2] - wrist[2]] for lm in landmarks]
+
+# Simpan ke file CSV
 def save_to_csv(filename, data, header):
     file_exists = os.path.isfile(filename)
     with open(filename, mode='a', newline='') as f:
@@ -66,7 +73,7 @@ def main():
         else:
             print("Masukkan pilihan yang valid (1 atau 2).")
 
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Tidak dapat membuka kamera.")
         return
@@ -92,7 +99,6 @@ def main():
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = hands.process(frame_rgb)
 
-        # Gambar landmark
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
                 mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
@@ -109,8 +115,7 @@ def main():
             print("Persiapkan posisi tangan. Mulai dalam 5 detik...")
             preparing = True
             prep_start_time = time.time()
-            
-        # Hitung mundur persiapan (tanpa freeze)
+        
         if preparing:
             elapsed_prep = time.time() - prep_start_time
             cv2.putText(frame, f"Bersiap... {int(5 - elapsed_prep)}", (10, 60),
@@ -122,12 +127,37 @@ def main():
                 sample_count = 0
                 print("Pengambilan data dimulai...")
 
-            
         if collecting and sample_count < num_samples:
             current_time = time.time()
             if current_time - start_time >= 1:  # Ambil setiap 1 detik
-                left_hand, right_hand = extract_landmarks(results)
-                num_hands_detected = sum([1 for hand in [left_hand, right_hand] if any(coord != 0.0 for coord in hand)])
+                if mode == 1:
+                    if results.multi_hand_landmarks:
+                        # Ambil satu tangan saja (tangan pertama)
+                        landmarks = [[lm.x, lm.y, lm.z] for lm in results.multi_hand_landmarks[0].landmark]
+                        wrist = landmarks[0]
+                        normalized = normalize_landmarks(landmarks, wrist)
+
+                        left_hand = [0.0] * 63
+                        right_hand = [coord for lm in normalized for coord in lm]
+                        num_hands_detected = 1
+                    else:
+                        left_hand = [0.0] * 63
+                        right_hand = [0.0] * 63
+                        num_hands_detected = 0
+
+                elif mode == 2:
+                    left_hand, right_hand = extract_landmarks(results)
+                    num_hands_detected = 0
+
+                    if any(coord != 0.0 for coord in left_hand):
+                        reshaped_left = reshape_landmarks(left_hand)
+                        left_hand = np.array(normalize_landmarks(reshaped_left, reshaped_left[0])).flatten().tolist()
+                        num_hands_detected += 1
+
+                    if any(coord != 0.0 for coord in right_hand):
+                        reshaped_right = reshape_landmarks(right_hand)
+                        right_hand = np.array(normalize_landmarks(reshaped_right, reshaped_right[0])).flatten().tolist()
+                        num_hands_detected += 1
 
                 if (mode == 1 and num_hands_detected == 1) or (mode == 2 and num_hands_detected == 2):
                     data_row = [label] + left_hand + right_hand
