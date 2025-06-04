@@ -27,7 +27,7 @@ This project is a **BISINDO (Indonesian Sign Language)** recognition system base
 │   ├── index.html                  # Real-time inference web page 
 │   └── model.json                  # TFJS model architecture
 │
-├── BISINDO.zip                     # Bisindo Dataset   
+├── BISINDO.zip                     # Bisindo Public Dataset   
 ├── README.md                       # Project documentation
 ├── notebook.ipynb                  # Jupyter Notebook version
 ├── notebook.py                     # Main script for training, evaluation & basic inference
@@ -71,6 +71,8 @@ Images are processed using **MediaPipe Hands** to extract 3D hand landmarks, whi
 
 * Normalized landmark features saved in CSV format.
 * Oversampling applied to balance the number of samples across classes.
+* Split is performed **stratified by class** to ensure each letter (A–Z) is proportionally represented in both sets.
+* This helps provide a reliable estimate of how well the model will generalize to unseen data.
 
 ### 3. **Model Training**
 
@@ -101,21 +103,23 @@ Images are processed using **MediaPipe Hands** to extract 3D hand landmarks, whi
 
 The models were evaluated using **accuracy**, **classification reports**, and **confusion matrices** on the test set.
 
-### 🔹 DNN (Deep Neural Network)
-
-* **Train Accuracy**: 99.30%
-* **Test Accuracy**: 99.77%
-
-The classification report shows near-perfect performance with consistent precision, recall, and f1-score across all classes. Only a few classes (e.g., ‘F’ and ‘P’) show slight drops in recall, but still remain within excellent performance range.
-
 ### 🔹 CNN 1D (1D Convolutional Neural Network)
 
-* **Train Accuracy**: 99.77%
+* **Train Accuracy**: 99.72%
 * **Test Accuracy**: 99.77%
 
 The CNN 1D model also performs exceptionally well, with almost identical metrics to the DNN model. There is no significant variance across classes based on the confusion matrix.
 
-### 📌 Summary:
+### 🔹 DNN (Deep Neural Network)
+
+* **Train Accuracy**: 99.39%
+* **Test Accuracy**: 99.77%
+
+The classification report shows near-perfect performance with consistent precision, recall, and f1-score across all classes. Only a few classes (e.g., ‘F’ and ‘P’) show slight drops in recall, but still remain within excellent performance range.
+
+---
+
+## 📌 Summary:
 
 Both models demonstrated outstanding ability to recognize hand gestures for A–Z letters on the test dataset. However, the unusually high performance may indicate potential **overfitting**, especially when considering the controlled dataset and data preparation process.
 
@@ -152,7 +156,7 @@ For model training & static inference:
 
 #### Option 1: Live Demo
 Access our ready-to-use demo:  
-👉 [Open the app in your browser](https://isyara-inference.netlify.app/) (Recommended: use Google Chrome for best compatibility)
+👉 [Open the app in your browser](https://isyara-inference-public.netlify.app/) (Recommended: use Google Chrome for best compatibility)
 
 #### Option 2: Local Deployment
 To run locally with the latest model:
