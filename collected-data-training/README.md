@@ -120,7 +120,7 @@ The CNN 1D model also performs exceptionally well, with almost identical metrics
 * **Train Accuracy**: 99.46%
 * **Test Accuracy**: 98.97%
 
-The classification report shows near-perfect performance with consistent precision, recall, and f1-score across all classes. Only a few classes (e.g., ‘F’ and ‘P’) show slight drops in recall, but still remain within excellent performance range.
+The classification report shows near-perfect performance with consistent precision, recall, and f1-score across all classes. Only a few classes (e.g., ‘L’, ‘M’ and ‘N’) show slight drops in recall, but still remain within excellent performance range.
 
 ---
 
